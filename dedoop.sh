@@ -1,4 +1,4 @@
-#!/usr/local/bin/bash
+#!/bin/bash
 . fun.sh    # Using super nerdy functional library as dependency
 
 shopt -s globstar # dotglob
