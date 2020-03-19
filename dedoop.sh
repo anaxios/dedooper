@@ -1,7 +1,7 @@
 #!/bin/bash
 . fun.sh    # Using super nerdy functional library as dependency
 
-shopt -s globstar # dotglob
+#shopt -s globstar # dotglob
 echo "Bash Version" $BASH_VERSION
 
 # Get the first argument passed in and remove any spaces                                
@@ -24,9 +24,9 @@ echo "Bash Version" $BASH_VERSION
         local -a x=("$@")
         local -a number of elements
 
-        r+=( "$(list "${x[@]}" \
-             | map lambda a . 'tup $(echo "$a" | cut -c 1-40 ) \
-                                   $(echo "$a" | cut -c 41- )')" )
+        r+=("$(list "${x[@]}" | map lambda a . \
+                                              'tup $(echo "$a" | cut -c 1-40 ) \
+                                                   $(echo "$a" | cut -c 41- )')" )
 
         echo "${r[@]}"  
             
@@ -41,11 +41,9 @@ echo "Bash Version" $BASH_VERSION
                 shift
                 local x=$@
 
-                if [[ -z $x ]]; then
-                    echo "${a[@]}"
-                else
-                    a+=( $(tup $(list $x | take 1 | cut -c 1-40 ) \
-                               $(list $x | take 1 | cut -c 41-)) )
+                if [[ -z $x ]]; then echo "${a[@]}"
+                else a+=($(tup $(list $x | take 1 | cut -c 1-40) \
+                               $(list $x | take 1 | cut -c 41-)))
 
                     tupify_itr $x 
                 fi
@@ -92,16 +90,15 @@ sortAnArray() {
             local -a hashes=( $(list ${x[@]} | map lambda a . 'tupl $a ') )
             #local firstElement
             local -a accumulator
-            
-            local firstElement
-                
+            local firstElement    
             local -a hashesfor
 
             while [[ ${#hashes[@]} -gt 0 ]]; do
                 firstElement=${hashes[0]}
 
                 for (( i = 1; i < ${#hashes[@]}; i++ )); do
-                        [[ "$firstElement" = "${hashes[$i]}" ]] && accumulator+=( $firstElement )
+                    [[ "$firstElement" = "${hashes[$i]}" ]] \
+                    && accumulator+=( $firstElement )
                 done
 
                 hashes=(${hashes[@]:1})  
@@ -138,14 +135,13 @@ checkForMatchRecur() { # rescursive is way too slow by 8X
 lookupFileNameFromHash() {
     local hashes=$@
     local -a filenameWithHashes
-    local -a leftSideOfDIR+=( $(list ${DIR[@]} | map lambda a . 'tupl $a ' ) )
+    local -a leftSideOfDIR=( $(list ${DIR[@]} | map lambda a . 'tupl $a ' ) )
     
     for i in ${hashes[@]}; do
         local accu=0
      for j in ${DIR[@]}; do
          [[ "${leftSideOfDIR[$accu]}" = "$i" ]] && filenameWithHashes+=( "$j" )
-            
-            accu=$(($accu + 1))
+         accu=$(($accu + 1))
          done
     done
  echo $(list ${filenameWithHashes[@]} | cut -c -42,$((${#workingDir} + 45))- )
@@ -160,6 +156,6 @@ lookupFileNameFromHash() {
 
 declare -a DIR=("$(tupify "${hashesFromShasum[@]}")")
 
-list $( sortAnArray $(lookupFileNameFromHash $(checkForMatch "${DIR[@]}")) )
+list $(sortAnArray $(lookupFileNameFromHash $(checkForMatch "${DIR[@]}")))
 
 
