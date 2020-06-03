@@ -108,13 +108,11 @@ for dirs in "$@"; do
 done
 
 checkForMatch 
-# echo ${#hashArray[@]}
-# echo ${#accumulator[@]}
 # echo ${#filenameAccu[@]}
 echo $findNotMatch
 sortAnArray
 echo "$( printMatch ) "
-
+echo "Found ${#accumulator[@]} duplicates out of ${#hashArray[@]} files searched."
 # # Get the first argument passed in and remove any spaces                                
 # #    declare -a workingDir=$(list "$1" | sed -e 's/[[:space:]]/_/g')
 
