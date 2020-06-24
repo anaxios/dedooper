@@ -1,271 +1,90 @@
-#!/bin/bash
+#!/usr/local/bin/bash
+
+set -e #u
+set -o pipefail
+ARGS=("$@")
 # . fun.sh    # Using super nerdy functional library as dependency
 
 #shopt -s globstar # dotglob
 echo "Bash Version" $BASH_VERSION
 
-declare -a hashArray
-declare -a filenameArray
-declare -a accumulator
-declare -a filenameAccu
-declare findNotMatch="0"
+declare -A hashArray
 
-sortAnArray() {
-    local -a listOfItems=( ${hashArray[@]} )
-    local -a listOfFilenames=( ${filenameArray[@]} )
-    local swapCounter=1 # <- Starts at one to initiate loop
-
-    while [[ $swapCounter -gt 0 ]]; do 
-        local itemIndex=0
-        local nextItemIndex=1 # look to see if next item in array is < or >
-
-        swapCounter=0
-
-        for i in "${listOfItems[@]}"; do
-
-            if [[ "${listOfItems[$nextItemIndex]}" > "${listOfItems[$itemIndex]}" ]]; then
-                local originalItem="${listOfItems[$itemIndex]}"
-                local originalFilename="${listOfFilenames[$itemIndex]}"
-
-                listOfItems[$itemIndex]="${listOfItems[$nextItemIndex]}"
-                listOfItems[$nextItemIndex]=$originalItem
-
-                listOfFilenames[$itemIndex]="${listOfFilenames[$nextItemIndex]}"
-                listOfFilenames[$nextItemIndex]=$originalFilename
-
-                swapCounter=$(($swapCounter + 1))
-            fi
-
-            itemIndex=$(($itemIndex + 1))
-            nextItemIndex=$(($nextItemIndex + 1))
-
-        done
+hasFlag() {
+    local flag=${1}
+    for arg in $ARGS; do
+        if [ "$flag" == "$arg" ]; then
+            echo "true"
+        fi
     done
-
-    hashArray=( ${listOfItems[@]} )
-    filenameArray=( ${listOfFilenames[@]} )
+    echo "false"
 }
-
 
 printMatch() {
-    for (( i = 0; i < ${#hashArray[@]}; i++ )); do
-        for match in "${accumulator[@]}"; do
-            if [ "${hashArray[$i]}" == "$match" ] && [ 0 -eq $findNotMatch ]; then
-                echo "${hashArray[$i]} ${filenameArray[$i]}"
-                echo " "
-            elif [ "${hashArray[$i]}" != "$match" ] && [ 1 -eq $findNotMatch ]; then
-                echo "${hashArray[$i]} ${filenameArray[$i]}"
-            fi
+    local i=($@)
+    local n
+    for K in "${!hashArray[@]}"; do
+        for match in $@; do
+             if [[ "${hashArray[$K]}" == $match ]]; then
+                n+=($match:"$K")
+             fi
         done
     done
+    printf '%s\n' "${n[@]}"
 }
-
-checkForMatch() {
-    local -a hashes=( ${hashArray[@]} )
-    local -a filenames=( ${filenameArray[@]} )
-
-    while [[ ${#hashes[@]} -gt 0 ]]; do
-        firstElement=${hashes[0]}
-        firstFilename=${filenames[0]}
-
-        for (( i = 1; i < ${#hashes[@]}; i++ )); do
-            if [[ "$firstElement" = "${hashes[$i]}" ]]; then
-                 accumulator+=( $firstElement )
-                filenameAccu+=( $firstFilename )
-            fi
-        done
-
-        hashes=(${hashes[@]:1})  
-        filenames=(${filenames[@]:1})
-
-
-    done
-}
-
 
 getHash() {
-    hashArray+=( $( shasum -a 1 "$1" 2> /dev/null | cut -c 1-40 - ) )
+     echo "$( shasum -a 1 "$1" 2> /dev/null | cut -c 1-40 - )"
 }
 
 listFiles() {
-    for file in "$2"/*; do
-        if [ -d "$file" ]; then
-            listFiles "$1" "$file"
-        elif [ -s "$file" ]; then
-             filenameArray+=( "$file" )
-             eval $1 "$file"
-         fi
-
-    done
+    local command="$1"
+    local n
+    loop() {
+        for file in "$2"/*; do
+            if [ -d "$file" ]; then
+                loop "$1" "$file"
+            elif [ -f "$file" ]; then
+                hashArray+=( ["$file"]=$($command "$file") )
+            fi
+        done
+    }
+    loop "$@"
+    echo $n
 }
 
-for dirs in "$@"; do
-    if [ "-n" == "$dirs" ]; then
-        findNotMatch="1"
-    elif [ -d "$dirs" ]; then
-        listFiles getHash "$dirs"
-    fi
-done
-
-checkForMatch 
-# echo ${#filenameAccu[@]}
-echo $findNotMatch
-sortAnArray
-echo "$( printMatch ) "
-echo "Found ${#accumulator[@]} duplicates out of ${#hashArray[@]} files searched."
-# # Get the first argument passed in and remove any spaces                                
-# #    declare -a workingDir=$(list "$1" | sed -e 's/[[:space:]]/_/g')
-
-# # Recursively get directories by using ls -R and removing everything but the full paths of the directories. Also replacing
-# #    declare -a directoriesToSearch=( "$(ls -R "$1" | grep -e '^/' | sed -e 's/://') ")
+main() {
+    for dir in "$@"; do
+        if [ "-n" == "$dir" ]; then
+            findNotMatch="1"
+        elif [ -d "$dir" ]; then
+            listFiles getHash "$dir"
+        fi
+    done
+    printMatch $(printf '%s ' $(printf '%s\n' ${hashArray[@]} | sort | uniq -d)) | sort -t ":" -k 1
+}
+main "${ARGS[@]}"
 
 
-
-# # maps shasum over all the directories and calls all the files inside. and replacing spaces with underscores
-# #    declare -a hashesFromShasum=( "$(list "${directoriesToSearch[@]}" \
-# #                                   | map lambda x . 'shasum -a 1 "$x"/* 2> /dev/null \
-# #                                  | sed -e 's/[[:space:]]/_/g' ')" ) 
-                                
-
-# # turns hashesFromShasum and file names into tuples can cut a section out of the middle to make it a little easier to read.
-#     tupify() {
-#         local -a r
-#         local -a x=("$@")
-#         local -a number of elements
-
-#         r+=("$(list "${x[@]}" | map lambda a . \
-#                                               'tup $(echo "$a" | cut -c 1-40 ) \
-#                                                    $(echo "$a" | cut -c 41- )')" )
-
-#         echo "${r[@]}"  
-            
-#     }
-
-# # Tupify recursively but runs too sloww
-
-#     tupifyRecur() {
-#         local a
-#             tupify_itr() {
-#                 local w=$@
-#                 shift
-#                 local x=$@
-
-#                 if [[ -z $x ]]; then echo "${a[@]}"
-#                 else a+=($(tup $(list $x | take 1 | cut -c 1-40) \
-#                                $(list $x | take 1 | cut -c 41-)))
-
-#                     tupify_itr $x 
-#                 fi
-#             }
-
-#         tupify_itr $@
-#     }
-
-
-# # if item in array is  > the item above it, move it one before. check next item in array
-# # repeat on entire list until no more swaps are needed
-
-# sortAnArray() {
-#     local -a listOfItems=("$*")
-#     local swapCounter=1 # <- Starts at one to initiate loop
-
-#     while [[ $swapCounter -gt 0 ]]; do 
-#         local itemIndex=0
-#         local nextItemIndex=1 # look to see if next item in array is < or >
-
-#         swapCounter=0
-
-#         for i in "${listOfItems[@]}"; do
- 
-#             if [[ "${listOfItems[$nextItemIndex]}" > "${listOfItems[$itemIndex]}" ]]; then
-#                 local originalItem="${listOfItems[$itemIndex]}"
-#                 listOfItems[$itemIndex]="${listOfItems[$nextItemIndex]}"
-#                 listOfItems[$nextItemIndex]=$originalItem
-#                 swapCounter=$(($swapCounter + 1))
-#             fi
-
-#             itemIndex=$(($itemIndex + 1))
-#             nextItemIndex=$(($nextItemIndex + 1))
-
-#         done
-#     done
-
-#     echo "${listOfItems[@]}"
-# }
-
-# # checks the head of the hash list with the tail and repeats on the tail until the list is empty
-#     checkForMatch() {
-#             local x=$@
-#             local -a hashes=( $(list ${x[@]} | map lambda a . 'tupl $a ') )
-#             #local firstElement
-#             local -a accumulator
-#             local firstElement    
-#             local -a hashesfor
-
-#             while [[ ${#hashes[@]} -gt 0 ]]; do
-#                 firstElement=${hashes[0]}
-
-#                 for (( i = 1; i < ${#hashes[@]}; i++ )); do
-#                     [[ "$firstElement" = "${hashes[$i]}" ]] \
-#                     && accumulator+=( $firstElement )
-#                 done
-
-#                 hashes=(${hashes[@]:1})  
-
-                   
-#             done
-            
-#             echo ${accumulator[@]} 
-#         }
-  
-# checkForMatchRecur() { # rescursive is way too slow by 8X
-#     local -a y
-      
-#     checkForMatch_irt() {
-#         local headx=$1
+# filterDup() {
+#     local n
+#     local outerhead
+#     outerloop() {
+#         if [[ ! $@ ]]; then return; fi
+#         outerhead=$1
 #         shift
-#         local -a tailx=$@
-          
-#         doesItMatch() {
-#             local headxz=$headx;
-            
-#             [[ $headxz != $1 ]] && echo "nope" || echo $1 ;
-#               }
-#         y+=( "$(list ${tailx[@]} | map lambda a . 'doesItMatch $a ')" )
-        
-#         [[ -z ${tailx[@]} ]] && list "${y[@]}" || checkForMatch_irt ${tailx[@]}
+#         loop() {
+#             if [[ ! $2 ]]; then return; fi
+#             if [ "$outerhead" == "$1" ]; then
+#                 n+=("$outerhead")
+#             fi
+#             shift
+#             loop $@
+#         }
+#         loop $@
+#         outerloop $@
 #     }
-          
-#     checkForMatch_irt $(list "$@" | map lambda a . 'tupl "$a" ')
+#     outerloop $@
+#     echo ${n[@]}
 # }
-    
-# # Look up the hashes that are duplcates in the original tupled array to get the file names
-# # with DIRs and make them a little prettier
-# lookupFileNameFromHash() {
-#     local hashes=$@
-#     local -a filenameWithHashes
-#     local -a leftSideOfDIR=( $(list ${DIR[@]} | map lambda a . 'tupl $a ' ) )
-    
-#     for i in ${hashes[@]}; do
-#         local accu=0
-#      for j in ${DIR[@]}; do
-#          [[ "${leftSideOfDIR[$accu]}" = "$i" ]] && filenameWithHashes+=( "$j" )
-#          accu=$(($accu + 1))
-#          done
-#     done
-#  echo $(list ${filenameWithHashes[@]} | cut -c -42,$((${#workingDir} + 45))- )
-# }   
-
-
-
-# # Start of program
-# # TODO add optional search for hidden files
-# # TODO add option for compairing two directories
-# # TODO remove using underscores with proper use of quotes
-
-# #declare -a DIR=("$(tupify "${hashesFromShasum[@]}")")
-
-# #list $(sortAnArray $(lookupFileNameFromHash $(checkForMatch "${DIR[@]}")))
-
-
 
