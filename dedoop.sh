@@ -5,12 +5,14 @@ set -o pipefail
 ARGS=("$@")
 # . fun.sh    # Using super nerdy functional library as dependency
 
-#shopt -s globstar # dotglob
+source ~/git/scripts/quicksort.sh
+
 echo "Bash Version" $BASH_VERSION
 
 declare -A hashArray
 
-hasFlag() {
+hasFlag()
+{
     local flag=${1}
     for arg in $ARGS; do
         if [ "$flag" == "$arg" ]; then
@@ -20,7 +22,8 @@ hasFlag() {
     echo "false"
 }
 
-printMatch() {
+printMatch()
+{
     local i=($@)
     local n
     for K in "${!hashArray[@]}"; do
@@ -33,14 +36,16 @@ printMatch() {
     printf '%s\n' "${n[@]}"
 }
 
-getHash() {
-     echo "$( shasum -a 1 "$1" 2> /dev/null | cut -c 1-40 - )"
+getHash()
+{
+    echo "$( shasum -a 1 "$1" 2> /dev/null | cut -c 1-40 - )"
 }
 
-listFiles() {
+listFiles()
+{
     local command="$1"
-    local n
-    loop() {
+    loop()
+    {
         for file in "$2"/*; do
             if [ -d "$file" ]; then
                 loop "$1" "$file"
@@ -50,10 +55,10 @@ listFiles() {
         done
     }
     loop "$@"
-    echo $n
 }
 
-main() {
+main()
+{
     for dir in "$@"; do
         if [ "-n" == "$dir" ]; then
             findNotMatch="1"
@@ -61,30 +66,32 @@ main() {
             listFiles getHash "$dir"
         fi
     done
-    printMatch $(printf '%s ' $(printf '%s\n' ${hashArray[@]} | sort | uniq -d)) | sort -t ":" -k 1
+    # printMatch $(printf '%s\n' ${hashArray[@]} | sort | uniq -d) | sort -t ":" -k 1
+    # quicksort "$(printMatch $(printf '%s\n' $(quicksort ${hashArray[@]}) | uniq -d))"
+    # printf '%s\n' $(quicksort ${hashArray[@]})
+    printf '%s\n' ${hashArray[@]} | sort
 }
 main "${ARGS[@]}"
 
 
-# filterDup() {
-#     local n
-#     local outerhead
-#     outerloop() {
-#         if [[ ! $@ ]]; then return; fi
-#         outerhead=$1
-#         shift
-#         loop() {
-#             if [[ ! $2 ]]; then return; fi
-#             if [ "$outerhead" == "$1" ]; then
-#                 n+=("$outerhead")
-#             fi
-#             shift
-#             loop $@
-#         }
-#         loop $@
-#         outerloop $@
-#     }
-#     outerloop $@
-#     echo ${n[@]}
-# }
+filterDup()
+{
+    local outerhead
+    outerloop()
+    {
+        if [[ ! "$@" ]]; then return; fi
+        outerhead="$1"
+        loop()
+        {
+            if [[ ! "$2" ]]; then return; fi
+            if [[ "$outerhead" == "$1" ]]; then echo "$outerhead"; fi
+            shift
+            loop "$@"
+        }
+        shift
+        loop "$@"
+        outerloop "$@"
+    }
+    outerloop "$@"
+}
 
